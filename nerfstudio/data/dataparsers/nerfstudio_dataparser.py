@@ -50,9 +50,9 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """Directory specifying location of data."""
     scale_factor: float = 1.0
     """How much to scale the camera origins by."""
-    downscale_factor: Optional[int] = None
+    downscale_factor: Optional[int] = 1
     """How much to downscale images. If not set, images are chosen such that the max dimension is <1600px."""
-    scene_scale: float = 1.0
+    scene_scale: float = 1.5
     """How much to scale the region of interest by."""
     orientation_method: Literal["pca", "up", "none"] = "up"
     """The method to use for orientation."""
@@ -60,7 +60,7 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """Whether to center the poses."""
     auto_scale_poses: bool = True
     """Whether to automatically scale the poses to fit in +/- 1 bounding box."""
-    train_split_percentage: float = 0.9
+    train_split_percentage: float = 0.95
     """The percent of images to use for training. The remaining images are for eval."""
 
 
@@ -182,9 +182,7 @@ class Nerfstudio(DataParser):
 
         poses = torch.from_numpy(np.array(poses).astype(np.float32))
         poses = camera_utils.auto_orient_and_center_poses(
-            poses,
-            method=orientation_method,
-            center_poses=self.config.center_poses,
+            poses, method=orientation_method, center_poses=self.config.center_poses,
         )
 
         # Scale poses
@@ -272,7 +270,7 @@ class Nerfstudio(DataParser):
                         break
                     df += 1
 
-                self.downscale_factor = 2**df
+                self.downscale_factor = 2 ** df
                 CONSOLE.log(f"Auto image downscale factor of {self.downscale_factor}")
             else:
                 self.downscale_factor = self.config.downscale_factor

@@ -64,19 +64,19 @@ class InstantNGPModelConfig(ModelConfig):
     """Number of samples in field evaluation."""
     grid_resolution: int = 128
     """Resolution of the grid used for the field."""
-    contraction_type: ContractionType = ContractionType.UN_BOUNDED_SPHERE
+    contraction_type: ContractionType = ContractionType.AABB
     """Resolution of the grid used for the field."""
     cone_angle: float = 0.004
     """Should be set to 0.0 for blender scenes but 1./256 for real scenes."""
-    render_step_size: float = 0.01
+    render_step_size: float = 0.001
     """Minimum step size for rendering."""
-    near_plane: float = 0.05
+    near_plane: float = 0.2
     """How far along ray to start sampling."""
     far_plane: float = 1e3
     """How far along ray to stop sampling."""
     use_appearance_embedding: bool = False
     """Whether to use an appearance embedding."""
-    randomize_background: bool = True
+    randomize_background: bool = False
     """Whether to randomize the background color."""
 
 
@@ -116,9 +116,7 @@ class NGPModel(Model):
         # Sampler
         vol_sampler_aabb = self.scene_box.aabb if self.config.contraction_type == ContractionType.AABB else None
         self.sampler = VolumetricSampler(
-            scene_aabb=vol_sampler_aabb,
-            occupancy_grid=self.occupancy_grid,
-            density_fn=self.field.density_fn,
+            scene_aabb=vol_sampler_aabb, occupancy_grid=self.occupancy_grid, density_fn=self.field.density_fn,
         )
 
         # renderers
@@ -142,8 +140,7 @@ class NGPModel(Model):
             # TODO: needs to get access to the sampler, on how the step size is determinated at each x. See
             # https://github.com/KAIR-BAIR/nerfacc/blob/127223b11401125a9fce5ce269bb0546ee4de6e8/examples/train_ngp_nerf.py#L190-L213
             self.occupancy_grid.every_n_step(
-                step=step,
-                occ_eval_fn=lambda x: self.field.get_opacity(x, self.config.render_step_size),
+                step=step, occ_eval_fn=lambda x: self.field.get_opacity(x, self.config.render_step_size),
             )
 
         return [
@@ -185,10 +182,7 @@ class NGPModel(Model):
         )
 
         rgb = self.renderer_rgb(
-            rgb=field_outputs[FieldHeadNames.RGB],
-            weights=weights,
-            ray_indices=ray_indices,
-            num_rays=num_rays,
+            rgb=field_outputs[FieldHeadNames.RGB], weights=weights, ray_indices=ray_indices, num_rays=num_rays,
         )
         depth = self.renderer_depth(
             weights=weights, ray_samples=ray_samples, ray_indices=ray_indices, num_rays=num_rays
@@ -226,10 +220,7 @@ class NGPModel(Model):
         image = batch["image"].to(self.device)
         rgb = outputs["rgb"]
         acc = colormaps.apply_colormap(outputs["accumulation"])
-        depth = colormaps.apply_depth_colormap(
-            outputs["depth"],
-            accumulation=outputs["accumulation"],
-        )
+        depth = colormaps.apply_depth_colormap(outputs["depth"], accumulation=outputs["accumulation"],)
         alive_ray_mask = colormaps.apply_colormap(outputs["alive_ray_mask"])
 
         combined_rgb = torch.cat([image, rgb], dim=1)
