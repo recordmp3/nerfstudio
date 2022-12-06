@@ -75,8 +75,8 @@ class DynamicBatchPipeline(VanillaPipeline):
             self.dynamic_num_rays_per_batch * (self.config.target_num_samples / num_samples_per_batch)
         )
 
-    def get_train_loss_dict(self, step: int):
-        model_outputs, loss_dict, metrics_dict = super().get_train_loss_dict(step)
+    def get_train_loss_dict(self, step: int, ray_bundle=None, batch=None, middle_results=None):
+        model_outputs, loss_dict, metrics_dict = super().get_train_loss_dict(step, ray_bundle, batch, middle_results)
 
         # update the number of rays for the next step
         if "num_samples_per_batch" not in metrics_dict:

@@ -104,6 +104,7 @@ class NGPModel(Model):
             num_images=self.num_train_data,
         )
 
+        print("field param name", [(x, y.shape) for x, y in self.field.state_dict().items()])
         self.scene_aabb = Parameter(self.scene_box.aabb.flatten(), requires_grad=False)
 
         # Occupancy Grid
@@ -158,7 +159,7 @@ class NGPModel(Model):
         param_groups["fields"] = list(self.field.parameters())
         return param_groups
 
-    def get_outputs(self, ray_bundle: RayBundle):
+    def get_outputs1(self, ray_bundle: RayBundle):
         assert self.field is not None
         num_rays = len(ray_bundle)
 
@@ -170,6 +171,11 @@ class NGPModel(Model):
                 render_step_size=self.config.render_step_size,
                 cone_angle=self.config.cone_angle,
             )
+
+        return ray_bundle, ray_samples, packed_info, ray_indices
+
+    def get_outputs2(self, ray_bundle, ray_samples, packed_info, ray_indices):
+        num_rays = len(ray_bundle)
 
         field_outputs = self.field(ray_samples)
 
@@ -211,6 +217,7 @@ class NGPModel(Model):
         mask = outputs["alive_ray_mask"]
         rgb_loss = self.rgb_loss(image[mask], outputs["rgb"][mask])
         loss_dict = {"rgb_loss": rgb_loss}
+        # loss_dict = {"rgb_loss": outputs["temp2"].mean()}
         return loss_dict
 
     def get_image_metrics_and_images(

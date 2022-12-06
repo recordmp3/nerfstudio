@@ -43,6 +43,7 @@ class OptimizerConfig(base_config.PrintableConfig):
         """Returns the instantiated object using the config."""
         kwargs = vars(self).copy()
         kwargs.pop("_target")
+        print("setting optimizer", [param.shape for param in params])
         return self._target(params, **kwargs)
 
 
@@ -75,6 +76,7 @@ def setup_optimizers(config: base_config.Config, param_groups: Dict[str, List[Pa
 
     # Add the camera optimizer if enabled.
     camera_optimizer_config = config.pipeline.datamanager.camera_optimizer
+    print("camera_optimizer", camera_optimizer_config.mode)
     if camera_optimizer_config.mode != "off":
         assert camera_optimizer_config.param_group not in optimizer_config
         optimizer_config[camera_optimizer_config.param_group] = {
@@ -97,12 +99,25 @@ class Optimizers:
         self.optimizers = {}
         self.schedulers = {}
         for param_group_name, params in param_groups.items():
+            print(param_group_name, len(params))
             lr_init = config[param_group_name]["optimizer"].lr
             self.optimizers[param_group_name] = config[param_group_name]["optimizer"].setup(params=params)
             if config[param_group_name]["scheduler"]:
                 self.schedulers[param_group_name] = config[param_group_name]["scheduler"].setup(
                     optimizer=self.optimizers[param_group_name], lr_init=lr_init
                 )
+
+    def test_invalid(self):
+
+        for _, optimizer in self.optimizers.items():
+            # print(_, optimizer.param_groups)
+            for x in optimizer.param_groups[0]["params"]:
+                print("A", _, x.shape, x.requires_grad, x.grad)
+        # for param_group_name, params in self.param_groups.items():
+        #     print(param_group_name, len(params))
+        #     for x in params:
+        #         print(torch.isnan(x.grad).any())
+        #         print(torch.isinf(x.grad).any())
 
     def optimizer_step(self, param_group_name: str) -> None:
         """Fetch and step corresponding optimizer.

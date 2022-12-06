@@ -243,7 +243,13 @@ class VanillaPipeline(Pipeline):
         return self.model.device
 
     @profiler.time_function
-    def get_train_loss_dict(self, step: int):
+    def pre_get_train_loss_dict(self, step: int):
+        ray_bundle, batch = self.datamanager.next_train(step)
+        middle_results = self.model.pre_forward(ray_bundle)
+        return ray_bundle, batch, middle_results
+
+    @profiler.time_function
+    def get_train_loss_dict(self, step: int, ray_bundle=None, batch=None, middle_results=None):
         """This function gets your training loss dict. This will be responsible for
         getting the next batch of data from the DataManager and interfacing with the
         Model class, feeding the data to the model's forward function.
@@ -251,8 +257,9 @@ class VanillaPipeline(Pipeline):
         Args:
             step: current iteration step to update sampler if using DDP (distributed)
         """
-        ray_bundle, batch = self.datamanager.next_train(step)
-        model_outputs = self.model(ray_bundle)
+        if ray_bundle is None:
+            ray_bundle, batch = self.datamanager.next_train(step)
+        model_outputs = self.model(ray_bundle, middle_results)
         metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
 
         camera_opt_param_group = self.config.datamanager.camera_optimizer.param_group

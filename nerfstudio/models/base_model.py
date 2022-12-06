@@ -64,13 +64,7 @@ class Model(nn.Module):
 
     config: ModelConfig
 
-    def __init__(
-        self,
-        config: ModelConfig,
-        scene_box: SceneBox,
-        num_train_data: int,
-        **kwargs,
-    ) -> None:
+    def __init__(self, config: ModelConfig, scene_box: SceneBox, num_train_data: int, **kwargs,) -> None:
         super().__init__()
         self.config = config
         self.scene_box = scene_box
@@ -124,18 +118,24 @@ class Model(nn.Module):
             Outputs of model. (ie. rendered colors)
         """
 
-    def forward(self, ray_bundle: RayBundle) -> Dict[str, torch.Tensor]:
+    def forward(self, ray_bundle: RayBundle, middle_result=None) -> Dict[str, torch.Tensor]:
         """Run forward starting with a ray bundle. This outputs different things depending on the configuration
         of the model and whether or not the batch is provided (whether or not we are training basically)
 
         Args:
             ray_bundle: containing all the information needed to render that ray latents included
         """
+        if middle_result is None:
+            if self.collider is not None:
+                ray_bundle = self.collider(ray_bundle)
+            middle_result = self.get_outputs1(ray_bundle)
+        return self.get_outputs2(*middle_result)
 
+    def pre_forward(self, ray_bundle: RayBundle):
         if self.collider is not None:
             ray_bundle = self.collider(ray_bundle)
-
-        return self.get_outputs(ray_bundle)
+        middle_result = self.get_outputs1(ray_bundle)
+        return middle_result
 
     def get_metrics_dict(self, outputs, batch) -> Dict[str, torch.Tensor]:
         """Compute and returns metrics.

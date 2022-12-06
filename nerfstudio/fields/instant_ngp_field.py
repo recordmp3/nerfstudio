@@ -31,6 +31,8 @@ from nerfstudio.field_components.embedding import Embedding
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.fields.base_field import Field
 
+from torch import nn
+
 try:
     import tinycudann as tcnn
 except ImportError:
@@ -92,11 +94,7 @@ class TCNNInstantNGPField(Field):
         per_level_scale = 1.4472692012786865
 
         self.direction_encoding = tcnn.Encoding(
-            n_input_dims=3,
-            encoding_config={
-                "otype": "SphericalHarmonics",
-                "degree": 4,
-            },
+            n_input_dims=3, encoding_config={"otype": "SphericalHarmonics", "degree": 4,},
         )
 
         self.mlp_base = tcnn.NetworkWithInputEncoding(
@@ -118,7 +116,7 @@ class TCNNInstantNGPField(Field):
                 "n_hidden_layers": num_layers - 1,
             },
         )
-
+        self.temp = nn.Linear(3, 3)
         in_dim = self.direction_encoding.n_output_dims + self.geo_feat_dim
         if self.use_appearance_embedding:
             in_dim += self.appearance_embedding_dim
@@ -138,8 +136,7 @@ class TCNNInstantNGPField(Field):
         positions = ray_samples.frustums.get_positions()
         positions_flat = positions.view(-1, 3)
         positions_flat = contract(x=positions_flat, roi=self.aabb, type=self.contraction_type)
-
-        h = self.mlp_base(positions_flat).view(*ray_samples.frustums.shape, -1)
+        h = self.mlp_base(self.temp(positions_flat)).view(*ray_samples.frustums.shape, -1)
         density_before_activation, base_mlp_out = torch.split(h, [1, self.geo_feat_dim], dim=-1)
 
         # Rectifying the density with an exponential is much more stable than a ReLU or

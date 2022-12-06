@@ -208,8 +208,7 @@ class Trainer:
         """Initializes viewer scene with given train dataset"""
         assert self.viewer_state and self.pipeline.datamanager.train_dataset
         self.viewer_state.init_scene(
-            dataset=self.pipeline.datamanager.train_dataset,
-            start_train=self.config.viewer.start_train,
+            dataset=self.pipeline.datamanager.train_dataset, start_train=self.config.viewer.start_train,
         )
         if not self.config.viewer.start_train:
             self._always_render(self._start_step)
@@ -311,10 +310,41 @@ class Trainer:
         """
         self.optimizers.zero_grad_all()
         cpu_or_cuda_str = self.device.split(":")[0]
+        print("cpu_or_cuda_str", cpu_or_cuda_str)
+
         with torch.autocast(device_type=cpu_or_cuda_str, enabled=self.mixed_precision):
-            _, loss_dict, metrics_dict = self.pipeline.get_train_loss_dict(step=step)
+            ray_bundle, batch, middle_results = self.pipeline.pre_get_train_loss_dict(step=step)
+
+        self.optimizers.zero_grad_all()
+        with torch.autocast(device_type=cpu_or_cuda_str, enabled=self.mixed_precision):
+            _, loss_dict, metrics_dict = self.pipeline.get_train_loss_dict(
+                step=step, ray_bundle=ray_bundle, batch=batch, middle_results=middle_results
+            )
             loss = functools.reduce(torch.add, loss_dict.values())
+            # loss = self.pipeline.model.field.get_density(ray_samples)[1].mean()
+
+            # model_outputs = self.pipeline.model.get_outputs2(ray_bundle, ray_samples, packed_info, ray_indices)
+
+            # metrics_dict = self.pipeline.model.get_metrics_dict(model_outputs, batch)
+
+            # loss_dict = self.pipeline.model.get_loss_dict(model_outputs, batch, metrics_dict)
+            # loss = loss_dict["rgb_loss"]
+            # loss = self.pipeline.model.field.get_density2().mean()
+
+            # ray_bundle, batch = self.datamanager.next_train(step)
+            # model_outputs = self.model(ray_bundle)
+            # metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
+
+            # loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
+
         self.grad_scaler.scale(loss).backward()  # type: ignore
+        self.optimizers.test_invalid()
+        for (
+            x
+        ) in (
+            self.pipeline.model.field.parameters()
+        ):  # also check the value of gradient: https://pytorch.org/docs/stable/generated/torch.autograd.gradcheck.html
+            print("debug in trainer", x.requires_grad, x.shape, x.grad)
         self.optimizers.optimizer_scaler_step_all(self.grad_scaler)
         self.grad_scaler.update()
         self.optimizers.scheduler_step_all(step)
