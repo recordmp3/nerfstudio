@@ -217,7 +217,6 @@ class NGPModel(Model):
         mask = outputs["alive_ray_mask"]
         rgb_loss = self.rgb_loss(image[mask], outputs["rgb"][mask])
         loss_dict = {"rgb_loss": rgb_loss}
-        # loss_dict = {"rgb_loss": outputs["temp2"].mean()}
         return loss_dict
 
     def get_image_metrics_and_images(

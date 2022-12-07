@@ -310,8 +310,6 @@ class Trainer:
         """
         self.optimizers.zero_grad_all()
         cpu_or_cuda_str = self.device.split(":")[0]
-        print("cpu_or_cuda_str", cpu_or_cuda_str)
-
         with torch.autocast(device_type=cpu_or_cuda_str, enabled=self.mixed_precision):
             ray_bundle, batch, middle_results = self.pipeline.pre_get_train_loss_dict(step=step)
 
@@ -321,23 +319,8 @@ class Trainer:
                 step=step, ray_bundle=ray_bundle, batch=batch, middle_results=middle_results
             )
             loss = functools.reduce(torch.add, loss_dict.values())
-            # loss = self.pipeline.model.field.get_density(ray_samples)[1].mean()
-
-            # model_outputs = self.pipeline.model.get_outputs2(ray_bundle, ray_samples, packed_info, ray_indices)
-
-            # metrics_dict = self.pipeline.model.get_metrics_dict(model_outputs, batch)
-
-            # loss_dict = self.pipeline.model.get_loss_dict(model_outputs, batch, metrics_dict)
-            # loss = loss_dict["rgb_loss"]
-            # loss = self.pipeline.model.field.get_density2().mean()
-
-            # ray_bundle, batch = self.datamanager.next_train(step)
-            # model_outputs = self.model(ray_bundle)
-            # metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
-
-            # loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
-
-        self.grad_scaler.scale(loss).backward()  # type: ignore
+        loss.backward()
+        # self.grad_scaler.scale(loss).backward()  # type: ignore
         self.optimizers.test_invalid()
         for (
             x
@@ -345,8 +328,9 @@ class Trainer:
             self.pipeline.model.field.parameters()
         ):  # also check the value of gradient: https://pytorch.org/docs/stable/generated/torch.autograd.gradcheck.html
             print("debug in trainer", x.requires_grad, x.shape, x.grad)
-        self.optimizers.optimizer_scaler_step_all(self.grad_scaler)
-        self.grad_scaler.update()
+        # self.optimizers.optimizer_scaler_step_all(self.grad_scaler)
+        self.optimizers.optimizer_step_all()
+        # self.grad_scaler.update()
         self.optimizers.scheduler_step_all(step)
 
         # Merging loss and metrics dict into a single output.
