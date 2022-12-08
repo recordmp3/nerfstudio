@@ -38,20 +38,20 @@ from nerfstudio.fields.base_field import Field
 class Deformation(nn.Module):
     def __init__(self, body_config: dict, embedding_config: dict):
         super(Deformation, self).__init__()
-        self.temp = nn.Linear(3, 3)
-        torch.nn.init.eye_(self.temp.weight)
+        # self.temp = nn.Linear(3, 3)
+        # torch.nn.init.eye_(self.temp.weight)
         # torch.nn.init.xavier_uniform_(self.temp)
-        torch.nn.init.constant_(self.temp.bias, 0.0)
-        # self.embedding, self.input_size = get_embedder(**embedding_config)
-        # body_config["input_ch"] = self.input_size
-        # self.body = body_config["type"](**body_config)
-        # self.contractor = contractor
+        # torch.nn.init.constant_(self.temp.bias, 0.0)
+        self.embedding, self.input_size = get_embedder(**embedding_config)
+        body_config["input_ch"] = self.input_size
+        self.body = body_config["type"](**body_config)
 
     def forward(self, x):
-        return self.temp(x)
+        # return self.temp(x)
         # print("enter Deformation")
-        h = self.embedding(self.contractor(x))
-        return self.body(h)
+        dx = self.body(self.embedding(x))
+        print("dx", dx)
+        return x + 0.001 * dx
 
 
 class DeformationMLPDeltaX(nn.Module):

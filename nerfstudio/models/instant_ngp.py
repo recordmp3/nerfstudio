@@ -110,7 +110,7 @@ class NGPModel(Model):
         self.deformation_field = None
         if self.config.deformation_status != "inactive":
             self.deformation_field = Deformation(
-                body_config={"type": DeformationMLPDeltaX, "D": 8, "W": 256, "skips": [4]},
+                body_config={"type": DeformationMLPDeltaX, "D": 6, "W": 128, "skips": [4]},
                 embedding_config={"multires": 10, "input_dims": 3,},
                 # contractor=lambda positions_flat: contract(
                 #     x=positions_flat, roi=self.field.aabb, type=self.field.contraction_type
