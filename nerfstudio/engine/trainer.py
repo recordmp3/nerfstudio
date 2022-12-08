@@ -319,8 +319,8 @@ class Trainer:
                 step=step, ray_bundle=ray_bundle, batch=batch, middle_results=middle_results
             )
             loss = functools.reduce(torch.add, loss_dict.values())
-        loss.backward()
-        # self.grad_scaler.scale(loss).backward()  # type: ignore
+        # loss.backward()
+        self.grad_scaler.scale(loss).backward()  # type: ignore
         self.optimizers.test_invalid()
         # for (
         #     x
@@ -328,9 +328,9 @@ class Trainer:
         #     self.pipeline.model.field.parameters()
         # ):  # also check the value of gradient: https://pytorch.org/docs/stable/generated/torch.autograd.gradcheck.html
         #     print("debug in trainer", x.requires_grad, x.shape, x.grad)
-        # self.optimizers.optimizer_scaler_step_all(self.grad_scaler)
-        self.optimizers.optimizer_step_all()
-        # self.grad_scaler.update()
+        self.optimizers.optimizer_scaler_step_all(self.grad_scaler)
+        # self.optimizers.optimizer_step_all()
+        self.grad_scaler.update()
         self.optimizers.scheduler_step_all(step)
 
         # Merging loss and metrics dict into a single output.

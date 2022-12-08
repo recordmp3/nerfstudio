@@ -160,6 +160,8 @@ class Nerfstudio(DataParser):
         # filter image_filenames and poses based on train/eval split percentage
         num_images = len(image_filenames)
         num_train_images = math.ceil(num_images * self.config.train_split_percentage)
+        if num_train_images == num_images:
+            num_train_images = num_images - 1
         num_eval_images = num_images - num_train_images
         i_all = np.arange(num_images)
         i_train = np.linspace(
