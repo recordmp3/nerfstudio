@@ -46,6 +46,8 @@ from nerfstudio.model_components.renderers import (
 )
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.utils import colormaps, colors
+from nerfstudio.fields.deformation_field import Deformation, DeformationMLPDeltaX
+from nerfacc import contract
 
 
 @dataclass
@@ -78,6 +80,7 @@ class InstantNGPModelConfig(ModelConfig):
     """Whether to use an appearance embedding."""
     randomize_background: bool = False
     """Whether to randomize the background color."""
+    deformation_status: str = "inactive"
 
 
 class NGPModel(Model):
@@ -103,8 +106,18 @@ class NGPModel(Model):
             use_appearance_embedding=self.config.use_appearance_embedding,
             num_images=self.num_train_data,
         )
+        print("field param name in ingp.py", [(x, y.shape) for x, y in self.field.state_dict().items()])
+        self.deformation_field = None
+        if self.config.deformation_status != "inactive":
+            self.deformation_field = Deformation(
+                body_config={"type": DeformationMLPDeltaX, "D": 8, "W": 256, "skips": [4]},
+                embedding_config={"multires": 10, "input_dims": 3,},
+                # contractor=lambda positions_flat: contract(
+                #     x=positions_flat, roi=self.field.aabb, type=self.field.contraction_type
+                # ),
+            )  # type: ignore
+            self.field.deformation_field = lambda x: self.deformation_field(x)
 
-        print("field param name", [(x, y.shape) for x, y in self.field.state_dict().items()])
         self.scene_aabb = Parameter(self.scene_box.aabb.flatten(), requires_grad=False)
 
         # Occupancy Grid
@@ -157,6 +170,8 @@ class NGPModel(Model):
         if self.field is None:
             raise ValueError("populate_fields() must be called before get_param_groups")
         param_groups["fields"] = list(self.field.parameters())
+        if self.deformation_field is not None:
+            param_groups["deformation_fields"] = list(self.deformation_field.parameters())
         return param_groups
 
     def get_outputs1(self, ray_bundle: RayBundle):

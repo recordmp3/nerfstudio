@@ -116,10 +116,7 @@ class TCNNInstantNGPField(Field):
                 "n_hidden_layers": num_layers - 1,
             },
         )
-        self.temp = nn.Linear(3, 3)  # try eyes
-        # torch.nn.init.xavier_uniform_(self.temp.weight, gain=1e-6)  # smaller
-        torch.nn.init.eye_(self.temp.weight)
-        torch.nn.init.constant_(self.temp.bias, 0.0)
+        self.deformation_field = None
         in_dim = self.direction_encoding.n_output_dims + self.geo_feat_dim
         if self.use_appearance_embedding:
             in_dim += self.appearance_embedding_dim
@@ -139,10 +136,11 @@ class TCNNInstantNGPField(Field):
         positions = ray_samples.frustums.get_positions()
         positions_flat = positions.view(-1, 3)
         positions_flat = contract(x=positions_flat, roi=self.aabb, type=self.contraction_type)
+        if self.deformation_field is not None:
+            positions_flat = self.deformation_field(positions_flat)
+            # print("field temp debug", self.deformation_field.weight, self.deformation_field.bias)
 
-        # h = self.mlp_base(positions_flat).view(*ray_samples.frustums.shape, -1)
-        h = self.mlp_base(positions_flat + self.temp(positions_flat)).view(*ray_samples.frustums.shape, -1)
-        print("field temp debug", self.temp.weight, self.temp.bias)
+        h = self.mlp_base(positions_flat).view(*ray_samples.frustums.shape, -1)
         density_before_activation, base_mlp_out = torch.split(h, [1, self.geo_feat_dim], dim=-1)
 
         # Rectifying the density with an exponential is much more stable than a ReLU or

@@ -200,9 +200,7 @@ def get_interpolated_k(k_a, k_b, steps: int = 10) -> TensorType[3, 4]:
 
 
 def get_interpolated_poses_many(
-    poses: TensorType["num_poses", 3, 4],
-    Ks: TensorType["num_poses", 3, 3],
-    steps_per_transition=10,
+    poses: TensorType["num_poses", 3, 4], Ks: TensorType["num_poses", 3, 3], steps_per_transition=10,
 ) -> Tuple[TensorType["num_poses", 3, 4], TensorType["num_poses", 3, 3]]:
     """Return interpolated poses for many camera poses.
 
@@ -250,12 +248,7 @@ def viewmatrix(lookat, up, pos) -> TensorType[...]:
 
 
 def get_distortion_params(
-    k1: float = 0.0,
-    k2: float = 0.0,
-    k3: float = 0.0,
-    k4: float = 0.0,
-    p1: float = 0.0,
-    p2: float = 0.0,
+    k1: float = 0.0, k2: float = 0.0, k3: float = 0.0, k4: float = 0.0, p1: float = 0.0, p2: float = 0.0,
 ) -> TensorType[...]:
     """Returns a distortion parameters matrix.
 
@@ -274,12 +267,10 @@ def get_distortion_params(
 
 @torch.jit.script
 def _compute_residual_and_jacobian(
-    x: torch.Tensor,
-    y: torch.Tensor,
-    xd: torch.Tensor,
-    yd: torch.Tensor,
-    distortion_params: torch.Tensor,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,]:
+    x: torch.Tensor, y: torch.Tensor, xd: torch.Tensor, yd: torch.Tensor, distortion_params: torch.Tensor,
+) -> Tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+]:
     """Auxiliary function of radial_and_tangential_undistort() that computes residuals and jacobians.
     Adapted from MultiNeRF:
     https://github.com/google-research/multinerf/blob/b02228160d3179300c7d499dca28cb9ca3677f32/internal/camera_utils.py#L427-L474
@@ -340,10 +331,7 @@ def _compute_residual_and_jacobian(
 
 @torch.jit.script
 def radial_and_tangential_undistort(
-    coords: torch.Tensor,
-    distortion_params: torch.Tensor,
-    eps: float = 1e-3,
-    max_iterations: int = 10,
+    coords: torch.Tensor, distortion_params: torch.Tensor, eps: float = 1e-3, max_iterations: int = 10,
 ) -> torch.Tensor:
     """Computes undistorted coords given opencv distortion parameters.
     Addapted from MultiNeRF
@@ -397,14 +385,8 @@ def rotation_matrix(a: TensorType[3], b: TensorType[3]) -> TensorType[3, 3]:
         eps = (torch.rand(3) - 0.5) * 0.01
         return rotation_matrix(a + eps, b)
     s = torch.linalg.norm(v)
-    skew_sym_mat = torch.Tensor(
-        [
-            [0, -v[2], v[1]],
-            [v[2], 0, -v[0]],
-            [-v[1], v[0], 0],
-        ]
-    )
-    return torch.eye(3) + skew_sym_mat + skew_sym_mat @ skew_sym_mat * ((1 - c) / (s**2 + 1e-8))
+    skew_sym_mat = torch.Tensor([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0],])
+    return torch.eye(3) + skew_sym_mat + skew_sym_mat @ skew_sym_mat * ((1 - c) / (s ** 2 + 1e-8))
 
 
 def auto_orient_and_center_poses(
@@ -455,6 +437,7 @@ def auto_orient_and_center_poses(
 
         rotation = rotation_matrix(up, torch.Tensor([0, 0, 1]))
         transform = torch.cat([rotation, rotation @ -translation[..., None]], dim=-1)
+        print("transform in camera_utils.py", transform)
         oriented_poses = transform @ poses
     elif method == "none":
         oriented_poses = poses
