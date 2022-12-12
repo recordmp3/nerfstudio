@@ -265,7 +265,8 @@ class Trainer:
             self._start_step = loaded_state["step"] + 1
             # load the checkpoints for pipeline, optimizers, and gradient scalar
             self.pipeline.load_pipeline(loaded_state["pipeline"])
-            self.optimizers.load_optimizers(loaded_state["optimizers"])
+            if not self.config.finetune:
+                self.optimizers.load_optimizers(loaded_state["optimizers"])
             self.grad_scaler.load_state_dict(loaded_state["scalers"])
             CONSOLE.print(f"done loading checkpoint from {load_path}")
         else:
@@ -309,6 +310,10 @@ class Trainer:
             step: Current training step.
         """
         self.optimizers.zero_grad_all()
+        if self.config.finetune:
+            for param in self.pipeline.model.named_parameters():
+                if "field." == param[0][:6]:
+                    param[1].requires_grad = False
         cpu_or_cuda_str = self.device.split(":")[0]
         with torch.autocast(device_type=cpu_or_cuda_str, enabled=self.mixed_precision):
             ray_bundle, batch, middle_results = self.pipeline.pre_get_train_loss_dict(step=step)
@@ -328,7 +333,9 @@ class Trainer:
         #     self.pipeline.model.field.parameters()
         # ):  # also check the value of gradient: https://pytorch.org/docs/stable/generated/torch.autograd.gradcheck.html
         #     print("debug in trainer", x.requires_grad, x.shape, x.grad)
-        self.optimizers.optimizer_scaler_step_all(self.grad_scaler)
+        self.optimizers.optimizer_scaler_step_all(
+            self.grad_scaler, skip_list=["fields"] if self.config.finetune else []
+        )
         # self.optimizers.optimizer_step_all()
         self.grad_scaler.update()
         self.optimizers.scheduler_step_all(step)

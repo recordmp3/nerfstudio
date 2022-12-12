@@ -51,7 +51,7 @@ class Deformation(nn.Module):
         # print("enter Deformation")
         dx = self.body(self.embedding(x))
         print("dx", dx)
-        return x + 0.001 * dx
+        return x + 1e-3 * dx
 
 
 class DeformationMLPDeltaX(nn.Module):

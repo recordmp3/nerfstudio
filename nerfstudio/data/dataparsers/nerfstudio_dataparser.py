@@ -52,7 +52,7 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """How much to scale the camera origins by."""
     downscale_factor: Optional[int] = 1
     """How much to downscale images. If not set, images are chosen such that the max dimension is <1600px."""
-    scene_scale: float = 1.5
+    scene_scale: float = 3
     """How much to scale the region of interest by."""
     orientation_method: Literal["pca", "up", "none"] = "up"
     """The method to use for orientation."""
@@ -62,6 +62,9 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """Whether to automatically scale the poses to fit in +/- 1 bounding box."""
     train_split_percentage: float = 0.95
     """The percent of images to use for training. The remaining images are for eval."""
+    train_start: int = -1
+    train_end: int = -1
+    """range of training set"""
 
 
 @dataclass
@@ -167,6 +170,8 @@ class Nerfstudio(DataParser):
         i_train = np.linspace(
             0, num_images - 1, num_train_images, dtype=int
         )  # equally spaced training images starting and ending at 0 and num_images-1
+        if self.config.train_start != -1:
+            i_train = np.array([i for i in range(train_start, train_end)])
         i_eval = np.setdiff1d(i_all, i_train)  # eval images are the remaining images
         assert len(i_eval) == num_eval_images
         if split == "train":

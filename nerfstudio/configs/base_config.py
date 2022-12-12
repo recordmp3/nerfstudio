@@ -216,18 +216,15 @@ class Config(PrintableConfig):
     pipeline: VanillaPipelineConfig = VanillaPipelineConfig()
     """Pipeline configuration"""
     optimizers: Dict[str, Any] = to_immutable_dict(
-        {
-            "fields": {
-                "optimizer": OptimizerConfig(),
-                "scheduler": SchedulerConfig(),
-            }
-        }
+        {"fields": {"optimizer": OptimizerConfig(), "scheduler": SchedulerConfig(),}}
     )
     """Dictionary of optimizer groups and their schedulers"""
     vis: Literal["viewer", "wandb", "tensorboard"] = "wandb"
     """Which visualizer to use."""
     data: Optional[Path] = None
     """Alias for --pipeline.datamanager.dataparser.data"""
+    finetune: bool = False
+    "when finetuning, optimizer will not be loaded, field param will be fixed"
 
     def is_viewer_enabled(self) -> bool:
         """Checks if a viewer is enabled."""

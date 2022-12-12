@@ -141,13 +141,15 @@ class Optimizers:
         for _, optimizer in self.optimizers.items():
             optimizer.zero_grad()
 
-    def optimizer_scaler_step_all(self, grad_scaler: GradScaler) -> None:
+    def optimizer_scaler_step_all(self, grad_scaler: GradScaler, skip_list=[]) -> None:
         """Take an optimizer step using a grad scaler.
 
         Args:
             grad_scaler: GradScaler to use
         """
         for _, optimizer in self.optimizers.items():
+            if _ in skip_list:
+                continue
             grad_scaler.step(optimizer)
 
     def optimizer_step_all(self):

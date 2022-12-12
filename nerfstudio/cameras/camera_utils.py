@@ -438,7 +438,7 @@ def auto_orient_and_center_poses(
         rotation = rotation_matrix(up, torch.Tensor([0, 0, 1]))
         transform = torch.cat([rotation, rotation @ -translation[..., None]], dim=-1)
         print("transform in camera_utils.py", transform)
-        oriented_poses = transform @ poses
+        oriented_poses = transform @ poses  # oriented_poses [N, 3, 4]
     elif method == "none":
         oriented_poses = poses
         poses[:, :3, 3] -= translation

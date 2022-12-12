@@ -372,7 +372,9 @@ class VanillaPipeline(Pipeline):
             state.pop("datamanager.train_ray_generator.pose_optimizer.pose_adjustment", None)
             state.pop("datamanager.eval_ray_generator.image_coords", None)
             state.pop("datamanager.eval_ray_generator.pose_optimizer.pose_adjustment", None)
-        self.load_state_dict(state)  # type: ignore
+        print("load_pipeline params", [x for x in state.keys()])
+        missing_keys, unexpected_keys = self.load_state_dict(state, strict=False)  # type: ignore
+        print("loading pipeline: missing", missing_keys, "\n", "unexpected", unexpected_keys)
 
     def get_training_callbacks(
         self, training_callback_attributes: TrainingCallbackAttributes

@@ -99,6 +99,7 @@ method_configs["instant-ngp"] = Config(
     },
     viewer=ViewerConfig(num_rays_per_chunk=64000),
     vis="viewer",
+    finetune=False,
 )
 
 method_configs["mipnerf"] = Config(
