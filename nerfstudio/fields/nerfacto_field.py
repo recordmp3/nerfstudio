@@ -91,7 +91,7 @@ class TCNNNerfactoField(Field):
         hidden_dim: int = 64,
         geo_feat_dim: int = 15,
         num_levels: int = 16,
-        max_res: int = 1024,
+        max_res: int = 2048,
         log2_hashmap_size: int = 19,
         num_layers_color: int = 3,
         num_layers_transient: int = 2,
@@ -125,16 +125,11 @@ class TCNNNerfactoField(Field):
         growth_factor = np.exp((np.log(max_res) - np.log(base_res)) / (num_levels - 1))
 
         self.direction_encoding = tcnn.Encoding(
-            n_input_dims=3,
-            encoding_config={
-                "otype": "SphericalHarmonics",
-                "degree": 4,
-            },
+            n_input_dims=3, encoding_config={"otype": "SphericalHarmonics", "degree": 4,},
         )
 
         self.position_encoding = tcnn.Encoding(
-            n_input_dims=3,
-            encoding_config={"otype": "Frequency", "n_frequencies": 2},
+            n_input_dims=3, encoding_config={"otype": "Frequency", "n_frequencies": 2},
         )
 
         self.mlp_base = tcnn.NetworkWithInputEncoding(
@@ -285,12 +280,7 @@ class TCNNNerfactoField(Field):
         # semantics
         if self.use_semantics:
             density_embedding_copy = density_embedding.clone().detach()
-            semantics_input = torch.cat(
-                [
-                    density_embedding_copy.view(-1, self.geo_feat_dim),
-                ],
-                dim=-1,
-            )
+            semantics_input = torch.cat([density_embedding_copy.view(-1, self.geo_feat_dim),], dim=-1,)
             x = self.mlp_semantics(semantics_input).view(*outputs_shape, -1).to(directions)
             outputs[FieldHeadNames.SEMANTICS] = self.field_head_semantics(x)
 
@@ -392,8 +382,7 @@ class TorchNerfactoField(Field):
             embedded_appearance = self.embedding_appearance(camera_indices)
         else:
             embedded_appearance = torch.zeros(
-                (*outputs_shape, self.appearance_embedding_dim),
-                device=ray_samples.frustums.directions.device,
+                (*outputs_shape, self.appearance_embedding_dim), device=ray_samples.frustums.directions.device,
             )
 
         outputs = {}

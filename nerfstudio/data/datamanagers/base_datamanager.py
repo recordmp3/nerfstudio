@@ -35,18 +35,14 @@ from nerfstudio.cameras.camera_optimizers import CameraOptimizerConfig
 from nerfstudio.cameras.cameras import CameraType
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.configs.base_config import InstantiateConfig
+from nerfstudio.data.dataparsers.base_dataparser import DataparserOutputs
 from nerfstudio.data.dataparsers.blender_dataparser import BlenderDataParserConfig
 from nerfstudio.data.dataparsers.dnerf_dataparser import DNeRFDataParserConfig
 from nerfstudio.data.dataparsers.friends_dataparser import FriendsDataParserConfig
-from nerfstudio.data.dataparsers.instant_ngp_dataparser import (
-    InstantNGPDataParserConfig,
-)
+from nerfstudio.data.dataparsers.instant_ngp_dataparser import InstantNGPDataParserConfig
 from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
 from nerfstudio.data.dataparsers.nuscenes_dataparser import NuScenesDataParserConfig
-from nerfstudio.data.dataparsers.phototourism_dataparser import (
-    PhototourismDataParserConfig,
-)
-from nerfstudio.data.dataparsers.record3d_dataparser import Record3DDataParserConfig
+from nerfstudio.data.dataparsers.phototourism_dataparser import PhototourismDataParserConfig
 from nerfstudio.data.datasets.base_dataset import InputDataset
 from nerfstudio.data.pixel_samplers import EquirectangularPixelSampler, PixelSampler
 from nerfstudio.data.utils.dataloaders import (
@@ -69,7 +65,6 @@ AnnotatedDataParserUnion = tyro.conf.OmitSubcommandPrefixes[  # Omit prefixes of
             "friends-data": FriendsDataParserConfig(),
             "instant-ngp-data": InstantNGPDataParserConfig(),
             "nuscenes-data": NuScenesDataParserConfig(),
-            "record3d-data": Record3DDataParserConfig(),
             "dnerf-data": DNeRFDataParserConfig(),
             "phototourism-data": PhototourismDataParserConfig(),
         },
@@ -296,6 +291,7 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
     config: VanillaDataManagerConfig
     train_dataset: InputDataset
     eval_dataset: InputDataset
+    train_dataparser_outputs: DataparserOutputs
 
     def __init__(
         self,
@@ -321,9 +317,9 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
 
     def create_train_dataset(self) -> InputDataset:
         """Sets up the data loaders for training"""
+        self.train_dataparser_outputs = self.dataparser.get_dataparser_outputs(split="train")
         return InputDataset(
-            dataparser_outputs=self.dataparser.get_dataparser_outputs(split="train"),
-            scale_factor=self.config.camera_res_scale_factor,
+            dataparser_outputs=self.train_dataparser_outputs, scale_factor=self.config.camera_res_scale_factor,
         )
 
     def create_eval_dataset(self) -> InputDataset:
@@ -365,8 +361,7 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
             num_cameras=self.train_dataset.cameras.size, device=self.device
         )
         self.train_ray_generator = RayGenerator(
-            self.train_dataset.cameras.to(self.device),
-            self.train_camera_optimizer,
+            self.train_dataset.cameras.to(self.device), self.train_camera_optimizer,
         )
 
     def setup_eval(self):
@@ -390,9 +385,7 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
         )
         # for loading full images
         self.fixed_indices_eval_dataloader = FixedIndicesEvalDataloader(
-            input_dataset=self.eval_dataset,
-            device=self.device,
-            num_workers=self.world_size * 4,
+            input_dataset=self.eval_dataset, device=self.device, num_workers=self.world_size * 4,
         )
         self.eval_dataloader = RandIndicesEvalDataloader(
             input_dataset=self.eval_dataset,

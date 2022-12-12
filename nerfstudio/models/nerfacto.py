@@ -71,7 +71,7 @@ class NerfactoModelConfig(ModelConfig):
     """Whether to randomize the background color."""
     num_levels: int = 16
     """Number of levels of the hashmap for the base mlp."""
-    max_res: int = 1024
+    max_res: int = 2048
     """Maximum resolution of the hashmap for the base mlp."""
     log2_hashmap_size: int = 19
     """Size of the hashmap for the base mlp"""
@@ -157,9 +157,7 @@ class NerfactoModel(Model):
             for i in range(num_prop_nets):
                 prop_net_args = self.config.proposal_net_args_list[min(i, len(self.config.proposal_net_args_list) - 1)]
                 network = HashMLPDensityField(
-                    self.scene_box.aabb,
-                    spatial_distortion=scene_contraction,
-                    **prop_net_args,
+                    self.scene_box.aabb, spatial_distortion=scene_contraction, **prop_net_args,
                 )
                 self.proposal_networks.append(network)
             self.density_fns.extend([network.density_fn for network in self.proposal_networks])
@@ -311,10 +309,7 @@ class NerfactoModel(Model):
         image = batch["image"].to(self.device)
         rgb = outputs["rgb"]
         acc = colormaps.apply_colormap(outputs["accumulation"])
-        depth = colormaps.apply_depth_colormap(
-            outputs["depth"],
-            accumulation=outputs["accumulation"],
-        )
+        depth = colormaps.apply_depth_colormap(outputs["depth"], accumulation=outputs["accumulation"],)
 
         combined_rgb = torch.cat([image, rgb], dim=1)
         combined_acc = torch.cat([acc], dim=1)
@@ -342,10 +337,7 @@ class NerfactoModel(Model):
 
         for i in range(self.config.num_proposal_iterations):
             key = f"prop_depth_{i}"
-            prop_depth_i = colormaps.apply_depth_colormap(
-                outputs[key],
-                accumulation=outputs["accumulation"],
-            )
+            prop_depth_i = colormaps.apply_depth_colormap(outputs[key], accumulation=outputs["accumulation"],)
             images_dict[key] = prop_depth_i
 
         return metrics_dict, images_dict
