@@ -672,9 +672,12 @@ class ViewerState:
 
         aspect_ratio = camera_object["aspect"]
 
-        image_height = (num_vis_rays / aspect_ratio) ** 0.5
-        image_height = int(round(image_height, -1))
-        image_height = min(self.max_resolution, image_height)
+        if not self.camera_moving and not is_training:
+            image_height = self.max_resolution
+        else:
+            image_height = (num_vis_rays / aspect_ratio) ** 0.5
+            image_height = int(round(image_height, -1))
+            image_height = min(self.max_resolution, image_height)
         image_width = int(image_height * aspect_ratio)
         if image_width > self.max_resolution:
             image_width = self.max_resolution
@@ -747,14 +750,7 @@ class ViewerState:
         )
 
         camera_to_world = camera_to_world_h[:3, :]
-        camera_to_world = torch.stack(
-            [
-                camera_to_world[0, :],
-                camera_to_world[2, :],
-                camera_to_world[1, :],
-            ],
-            dim=0,
-        )
+        camera_to_world = torch.stack([camera_to_world[0, :], camera_to_world[2, :], camera_to_world[1, :],], dim=0,)
 
         times = self.vis["renderingState/render_time"].read()
         if times is not None:
