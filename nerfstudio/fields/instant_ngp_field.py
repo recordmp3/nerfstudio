@@ -136,6 +136,7 @@ class TCNNInstantNGPField(Field):
         positions = ray_samples.frustums.get_positions()
         positions_flat = positions.view(-1, 3)
         positions_flat = contract(x=positions_flat, roi=self.aabb, type=self.contraction_type)
+        print("pos", positions_flat.max(0)[0], positions_flat.min(0)[0])
         if self.deformation_field is not None:
             positions_flat = self.deformation_field(positions_flat)
             # print("field temp debug", self.deformation_field.weight, self.deformation_field.bias)
@@ -147,6 +148,8 @@ class TCNNInstantNGPField(Field):
         # softplus, because it enables high post-activation (float32) density outputs
         # from smaller internal (float16) parameters.
         density = trunc_exp(density_before_activation.to(positions))
+        # density[torch.max(torch.abs(positions_flat - 0.5), -1)[0] * 2 > 0.6] = 0.0
+        # density[torch.max(torch.abs(positions_flat - 0.5), -1)[0] * 2 > 0.95] = 1.0
         return density, base_mlp_out
 
     def get_outputs(self, ray_samples: RaySamples, density_embedding: Optional[TensorType] = None):
@@ -173,6 +176,10 @@ class TCNNInstantNGPField(Field):
             h = torch.cat([h, embedded_appearance.view(-1, self.appearance_embedding_dim)], dim=-1)
 
         rgb = self.mlp_head(h).view(*ray_samples.frustums.directions.shape[:-1], -1).to(directions)
+        # positions = ray_samples.frustums.get_positions()
+        # positions_flat = positions.view(-1, 3)
+        # positions_flat = contract(x=positions_flat, roi=self.aabb, type=self.contraction_type)
+        # rgb[torch.max(torch.abs(positions_flat - 0.5), -1)[0] * 2 > 0.95] = 0.0
         return {FieldHeadNames.RGB: rgb}
 
     def get_opacity(self, positions: TensorType["bs":..., 3], step_size) -> TensorType["bs":..., 1]:

@@ -35,10 +35,7 @@ class Sampler(nn.Module):
         num_samples: number of samples to take
     """
 
-    def __init__(
-        self,
-        num_samples: Optional[int] = None,
-    ) -> None:
+    def __init__(self, num_samples: Optional[int] = None,) -> None:
         super().__init__()
         self.num_samples = num_samples
 
@@ -77,9 +74,7 @@ class SpacedSampler(Sampler):
         self.spacing_fn_inv = spacing_fn_inv
 
     def generate_ray_samples(
-        self,
-        ray_bundle: Optional[RayBundle] = None,
-        num_samples: Optional[int] = None,
+        self, ray_bundle: Optional[RayBundle] = None, num_samples: Optional[int] = None,
     ) -> RaySamples:
         """Generates position samples accoring to spacing function.
 
@@ -135,12 +130,7 @@ class UniformSampler(SpacedSampler):
         single_jitter: Use a same random jitter for all samples along a ray. Defaults to False
     """
 
-    def __init__(
-        self,
-        num_samples: Optional[int] = None,
-        train_stratified=True,
-        single_jitter=False,
-    ) -> None:
+    def __init__(self, num_samples: Optional[int] = None, train_stratified=True, single_jitter=False,) -> None:
         super().__init__(
             num_samples=num_samples,
             spacing_fn=lambda x: x,
@@ -159,12 +149,7 @@ class LinearDisparitySampler(SpacedSampler):
         single_jitter: Use a same random jitter for all samples along a ray. Defaults to False
     """
 
-    def __init__(
-        self,
-        num_samples: Optional[int] = None,
-        train_stratified=True,
-        single_jitter=False,
-    ) -> None:
+    def __init__(self, num_samples: Optional[int] = None, train_stratified=True, single_jitter=False,) -> None:
         super().__init__(
             num_samples=num_samples,
             spacing_fn=lambda x: 1 / x,
@@ -182,16 +167,11 @@ class SqrtSampler(SpacedSampler):
         train_stratified: Use stratified sampling during training. Defults to True
     """
 
-    def __init__(
-        self,
-        num_samples: Optional[int] = None,
-        train_stratified=True,
-        single_jitter=False,
-    ) -> None:
+    def __init__(self, num_samples: Optional[int] = None, train_stratified=True, single_jitter=False,) -> None:
         super().__init__(
             num_samples=num_samples,
             spacing_fn=torch.sqrt,
-            spacing_fn_inv=lambda x: x**2,
+            spacing_fn_inv=lambda x: x ** 2,
             train_stratified=train_stratified,
             single_jitter=single_jitter,
         )
@@ -205,12 +185,7 @@ class LogSampler(SpacedSampler):
         train_stratified: Use stratified sampling during training. Defults to True
     """
 
-    def __init__(
-        self,
-        num_samples: Optional[int] = None,
-        train_stratified=True,
-        single_jitter=False,
-    ) -> None:
+    def __init__(self, num_samples: Optional[int] = None, train_stratified=True, single_jitter=False,) -> None:
         super().__init__(
             num_samples=num_samples,
             spacing_fn=torch.log,
@@ -231,12 +206,7 @@ class UniformLinDispPiecewiseSampler(SpacedSampler):
         single_jitter: Use a same random jitter for all samples along a ray. Defaults to False
     """
 
-    def __init__(
-        self,
-        num_samples: Optional[int] = None,
-        train_stratified=True,
-        single_jitter=False,
-    ) -> None:
+    def __init__(self, num_samples: Optional[int] = None, train_stratified=True, single_jitter=False,) -> None:
         super().__init__(
             num_samples=num_samples,
             spacing_fn=lambda x: torch.where(x < 1, x / 2, 1 - 1 / (2 * x)),
@@ -331,13 +301,7 @@ class PDFSampler(Sampler):
             ray_samples.spacing_starts is not None and ray_samples.spacing_ends is not None
         ), "ray_sample spacing_starts and spacing_ends must be provided"
         assert ray_samples.spacing_to_euclidean_fn is not None, "ray_samples.spacing_to_euclidean_fn must be provided"
-        existing_bins = torch.cat(
-            [
-                ray_samples.spacing_starts[..., 0],
-                ray_samples.spacing_ends[..., -1:, 0],
-            ],
-            dim=-1,
-        )
+        existing_bins = torch.cat([ray_samples.spacing_starts[..., 0], ray_samples.spacing_ends[..., -1:, 0],], dim=-1,)
 
         inds = torch.searchsorted(cdf, u, side="right")
         below = torch.clamp(inds - 1, 0, existing_bins.shape[-1] - 1)
@@ -466,9 +430,10 @@ class VolumetricSampler(Sampler):
             far_plane=far_plane,
             stratified=self.training,
             cone_angle=cone_angle,
-            alpha_thre=1e-2,
+            alpha_thre=1e-3,
         )
         num_samples = starts.shape[0]
+        # print("starts shape", starts.shape, rays_o.shape)
         if num_samples == 0:
             # create a single fake sample and update packed_info accordingly
             # this says the last ray in packed_info has 1 sample, which starts and ends at 1
@@ -484,13 +449,7 @@ class VolumetricSampler(Sampler):
 
         zeros = torch.zeros_like(origins[:, :1])
         ray_samples = RaySamples(
-            frustums=Frustums(
-                origins=origins,
-                directions=dirs,
-                starts=starts,
-                ends=ends,
-                pixel_area=zeros,
-            ),
+            frustums=Frustums(origins=origins, directions=dirs, starts=starts, ends=ends, pixel_area=zeros,),
             camera_indices=camera_indices,
         )
         return ray_samples, packed_info, ray_indices
@@ -533,9 +492,7 @@ class ProposalNetworkSampler(Sampler):
         self._steps_since_update += 1
 
     def generate_ray_samples(
-        self,
-        ray_bundle: Optional[RayBundle] = None,
-        density_fns: Optional[List[Callable]] = None,
+        self, ray_bundle: Optional[RayBundle] = None, density_fns: Optional[List[Callable]] = None,
     ) -> Tuple[RaySamples, List, List]:
         assert ray_bundle is not None
         assert density_fns is not None
