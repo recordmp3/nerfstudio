@@ -515,10 +515,15 @@ def run_colmap(
         colmap_database_path.unlink()
 
     # Feature extraction
+    print(str(image_dir))
+    input()
+    mask_dir = str(image_dir)[:-6] + "masks"
+    print(mask_dir)
     feature_extractor_cmd = [
         f"{colmap_cmd} feature_extractor",
         f"--database_path {colmap_dir / 'database.db'}",
         f"--image_path {image_dir}",
+        f"--ImageReader.mask_path {mask_dir}",
         "--ImageReader.single_camera 1",
         f"--ImageReader.camera_model {camera_model.value}",
         f"--SiftExtraction.use_gpu {int(gpu)}",

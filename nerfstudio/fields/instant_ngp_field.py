@@ -136,7 +136,7 @@ class TCNNInstantNGPField(Field):
         positions = ray_samples.frustums.get_positions()
         positions_flat = positions.view(-1, 3)
         positions_flat = contract(x=positions_flat, roi=self.aabb, type=self.contraction_type)
-        print("pos", positions_flat.max(0)[0], positions_flat.min(0)[0])
+        # print("pos", positions_flat.max(0)[0], positions_flat.min(0)[0])
         if self.deformation_field is not None:
             positions_flat = self.deformation_field(positions_flat)
             # print("field temp debug", self.deformation_field.weight, self.deformation_field.bias)

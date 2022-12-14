@@ -22,7 +22,7 @@ from typing import Dict
 import torch
 
 
-def collate_image_dataset_batch(batch: Dict, num_rays_per_batch: int, keep_full_image: bool = False):
+def collate_image_dataset_batch(batch: Dict, num_rays_per_batch: int, keep_full_image: bool = False, stored={}):
     """
     Operates on a batch of images and samples pixels to use for generating rays.
     Returns a collated batch which is input to the Graph.
@@ -38,7 +38,12 @@ def collate_image_dataset_batch(batch: Dict, num_rays_per_batch: int, keep_full_
 
     # only sample within the mask, if the mask is in the batch
     if "mask" in batch:
-        nonzero_indices = torch.nonzero(batch["mask"][..., 0].to(device), as_tuple=False)
+        # print("mask_shape", batch["mask"].shape)
+        if not bool(stWored):
+            nonzero_indices = torch.nonzero(batch["mask"][..., 0].to(device), as_tuple=False)
+            stored["nonzero"] = nonzero_indices
+        else:
+            nonzero_indices = stored["nonzero"]
         chosen_indices = random.sample(range(len(nonzero_indices)), k=num_rays_per_batch)
         indices = nonzero_indices[chosen_indices]
     else:
@@ -144,6 +149,7 @@ class PixelSampler:  # pylint: disable=too-few-public-methods
     def __init__(self, num_rays_per_batch: int, keep_full_image: bool = False) -> None:
         self.num_rays_per_batch = num_rays_per_batch
         self.keep_full_image = keep_full_image
+        self.stored = {}
 
     def set_num_rays_per_batch(self, num_rays_per_batch: int):
         """Set the number of rays to sample per batch.
@@ -166,7 +172,7 @@ class PixelSampler:  # pylint: disable=too-few-public-methods
             )
         elif isinstance(image_batch["image"], torch.Tensor):
             pixel_batch = collate_image_dataset_batch(
-                image_batch, self.num_rays_per_batch, keep_full_image=self.keep_full_image
+                image_batch, self.num_rays_per_batch, keep_full_image=self.keep_full_image, stored=self.stored
             )
         else:
             raise ValueError("image_batch['image'] must be a list or torch.Tensor")

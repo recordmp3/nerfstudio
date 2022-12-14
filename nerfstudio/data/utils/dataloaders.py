@@ -147,10 +147,7 @@ class EvalDataloader(DataLoader):
     """
 
     def __init__(
-        self,
-        input_dataset: InputDataset,
-        device: Union[torch.device, str] = "cpu",
-        **kwargs,
+        self, input_dataset: InputDataset, device: Union[torch.device, str] = "cpu", **kwargs,
     ):
         self.input_dataset = input_dataset
         self.cameras = input_dataset.cameras.to(device)
@@ -232,10 +229,7 @@ class RandIndicesEvalDataloader(EvalDataloader):
     """
 
     def __init__(
-        self,
-        input_dataset: InputDataset,
-        device: Union[torch.device, str] = "cpu",
-        **kwargs,
+        self, input_dataset: InputDataset, device: Union[torch.device, str] = "cpu", **kwargs,
     ):
         super().__init__(input_dataset, device, **kwargs)
         self.count = 0
