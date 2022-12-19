@@ -148,6 +148,15 @@ class TCNNInstantNGPField(Field):
         # softplus, because it enables high post-activation (float32) density outputs
         # from smaller internal (float16) parameters.
         density = trunc_exp(density_before_activation.to(positions))
+        density[torch.max(positions_flat, -1)[0] > 1] = 0.0
+        density[torch.min(positions_flat, -1)[0] < 0] = 0.0
+        # pos_bb = (positions_flat - 0.5) * 2
+        # density[pos_bb[:, 2] > -0.25] = 0
+        # density[pos_bb[:, 2] < -0.75] = 0
+        # density[pos_bb[:, 1] > 0.3] = 0
+        # density[pos_bb[:, 1] < -0.3] = 0
+        # density[pos_bb[:, 0] > 0.3] = 0
+        # density[pos_bb[:, 0] < -0.3] = 0
         # density[torch.max(torch.abs(positions_flat - 0.5), -1)[0] * 2 > 0.6] = 0.0
         # density[torch.max(torch.abs(positions_flat - 0.5), -1)[0] * 2 > 0.95] = 1.0
         return density, base_mlp_out

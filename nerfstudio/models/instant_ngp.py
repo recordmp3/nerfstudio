@@ -46,7 +46,7 @@ from nerfstudio.model_components.renderers import (
 )
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.utils import colormaps, colors
-from nerfstudio.fields.deformation_field import Deformation, DeformationMLPDeltaX
+from nerfstudio.fields.deformation_field import Deformation, DeformationMLPDeltaX, DeformationMLPSE3
 from nerfacc import contract
 
 
@@ -110,7 +110,8 @@ class NGPModel(Model):
         self.deformation_field = None
         if self.config.deformation_status != "inactive":
             self.deformation_field = Deformation(
-                body_config={"type": DeformationMLPDeltaX, "D": 6, "W": 128, "skips": [4]},
+                # body_config={"type": DeformationMLPDeltaX, "D": 6, "W": 128, "skips": [4]},
+                body_config={"type": DeformationMLPSE3, "input_ch": 3, "D": 6, "W": 128, "skips": [4]},
                 embedding_config={"multires": 10, "input_dims": 3,},
                 # contractor=lambda positions_flat: contract(
                 #     x=positions_flat, roi=self.field.aabb, type=self.field.contraction_type
@@ -134,7 +135,7 @@ class NGPModel(Model):
         )
 
         # renderers
-        background_color = "random" if self.config.randomize_background else colors.BLACK
+        background_color = "random" if self.config.randomize_background else colors.WHITE
         self.renderer_rgb = RGBRenderer(background_color=background_color)
         self.renderer_accumulation = AccumulationRenderer()
         self.renderer_depth = DepthRenderer(method="expected")

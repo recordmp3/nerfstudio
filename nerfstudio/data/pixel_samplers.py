@@ -44,8 +44,16 @@ def collate_image_dataset_batch(batch: Dict, num_rays_per_batch: int, keep_full_
             stored["nonzero"] = nonzero_indices
         else:
             nonzero_indices = stored["nonzero"]
+
+        empty_num_rays = int(num_rays_per_batch * 0.3)
+        empty_indices = torch.floor(
+            torch.rand((empty_num_rays, 3), device=device)
+            * torch.tensor([num_images, image_height, image_width], device=device)
+        ).long()
+
         chosen_indices = random.sample(range(len(nonzero_indices)), k=num_rays_per_batch)
         indices = nonzero_indices[chosen_indices]
+        indices[:empty_num_rays, :] = empty_indices
     else:
         indices = torch.floor(
             torch.rand((num_rays_per_batch, 3), device=device)

@@ -52,8 +52,10 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """How much to scale the camera origins by."""
     downscale_factor: Optional[int] = 1
     """How much to downscale images. If not set, images are chosen such that the max dimension is <1600px."""
-    scene_scale: float = 2
+    scene_scale: float = 1
     """How much to scale the region of interest by."""
+    bb = [[-0.3, -0.3, -0.75], [0.3, 0.3, -0.25]]
+    """bounding box (higher priority than scene_scale"""
     orientation_method: Literal["pca", "up", "none"] = "up"
     """The method to use for orientation."""
     center_poses: bool = True
@@ -62,7 +64,7 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """Whether to automatically scale the poses to fit in +/- 1 bounding box."""
     train_split_percentage: float = 0.95
     """The percent of images to use for training. The remaining images are for eval."""
-    train_start: int = -1
+    train_start: int = 0
     train_end: int = 306
     """range of training set"""
 
@@ -210,11 +212,14 @@ class Nerfstudio(DataParser):
         # in x,y,z order
         # assumes that the scene is centered at the origin
         aabb_scale = self.config.scene_scale
-        scene_box = SceneBox(
-            aabb=torch.tensor(
-                [[-aabb_scale, -aabb_scale, -aabb_scale], [aabb_scale, aabb_scale, aabb_scale]], dtype=torch.float32
+        if self.config.bb is not None:
+            scene_box = SceneBox(aabb=torch.tensor(self.config.bb, dtype=torch.float32))
+        else:
+            scene_box = SceneBox(
+                aabb=torch.tensor(
+                    [[-aabb_scale, -aabb_scale, -aabb_scale], [aabb_scale, aabb_scale, aabb_scale]], dtype=torch.float32
+                )
             )
-        )
 
         if "camera_model" in meta:
             camera_type = CAMERA_MODEL_TO_TYPE[meta["camera_model"]]
