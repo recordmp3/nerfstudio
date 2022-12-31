@@ -84,23 +84,6 @@ method_configs["nerfacto"] = Config(
     vis="viewer",
 )
 
-method_configs["instant-ngp"] = Config(
-    method_name="instant-ngp",
-    trainer=TrainerConfig(
-        steps_per_eval_batch=500, steps_per_save=2000, max_num_iterations=30000, mixed_precision=True
-    ),
-    pipeline=DynamicBatchPipelineConfig(
-        datamanager=VanillaDataManagerConfig(dataparser=NerfstudioDataParserConfig(), train_num_rays_per_batch=8192),
-        model=InstantNGPModelConfig(eval_num_rays_per_chunk=8192),
-    ),
-    optimizers={
-        "fields": {"optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15), "scheduler": None,},
-        "deformation_fields": {"optimizer": AdamOptimizerConfig(lr=1e-4), "scheduler": None,},
-    },
-    viewer=ViewerConfig(num_rays_per_chunk=64000),
-    vis="viewer",
-    finetune=False,
-)
 
 method_configs["mipnerf"] = Config(
     method_name="mipnerf",
@@ -146,6 +129,24 @@ method_configs["vanilla-nerf"] = Config(
         "fields": {"optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08), "scheduler": None,},
         "temporal_distortion": {"optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08), "scheduler": None,},
     },
+)
+
+method_configs["instant-ngp"] = Config(
+    method_name="instant-ngp",
+    trainer=TrainerConfig(
+        steps_per_eval_batch=500, steps_per_save=2000, max_num_iterations=30000, mixed_precision=True
+    ),
+    pipeline=DynamicBatchPipelineConfig(
+        datamanager=VanillaDataManagerConfig(dataparser=NerfstudioDataParserConfig(), train_num_rays_per_batch=8192),
+        model=InstantNGPModelConfig(eval_num_rays_per_chunk=8192),
+    ),
+    optimizers={
+        "fields": {"optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15), "scheduler": None,},
+        "deformation_fields": {"optimizer": AdamOptimizerConfig(lr=1e-3), "scheduler": None,},
+    },
+    viewer=ViewerConfig(num_rays_per_chunk=64000),
+    vis="viewer",
+    finetune=False,
 )
 
 method_configs["tensorf"] = Config(

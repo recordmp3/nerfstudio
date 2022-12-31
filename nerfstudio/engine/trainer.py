@@ -315,10 +315,14 @@ class Trainer:
                 if "field." == param[0][:6]:
                     param[1].requires_grad = False
         cpu_or_cuda_str = self.device.split(":")[0]
-        with torch.autocast(device_type=cpu_or_cuda_str, enabled=self.mixed_precision):
-            ray_bundle, batch, middle_results = self.pipeline.pre_get_train_loss_dict(step=step)
+        class_name = self.pipeline.model.__class__.__name__
+        if class_name == "NGPModel":
+            with torch.autocast(device_type=cpu_or_cuda_str, enabled=self.mixed_precision):
+                ray_bundle, batch, middle_results = self.pipeline.pre_get_train_loss_dict(step=step)
 
-        self.optimizers.zero_grad_all()
+            self.optimizers.zero_grad_all()
+        else:
+            ray_bundle, batch, middle_results = None, None, None
         with torch.autocast(device_type=cpu_or_cuda_str, enabled=self.mixed_precision):
             _, loss_dict, metrics_dict = self.pipeline.get_train_loss_dict(
                 step=step, ray_bundle=ray_bundle, batch=batch, middle_results=middle_results

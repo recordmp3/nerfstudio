@@ -30,6 +30,7 @@ from nerfstudio.field_components.activations import trunc_exp
 from nerfstudio.field_components.embedding import Embedding
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.fields.base_field import Field
+from nerfstudio.fields.geom_utils import to_original
 
 from torch import nn
 
@@ -132,13 +133,21 @@ class TCNNInstantNGPField(Field):
             },
         )
 
+    def get_new_pt_from_deform(self, x):
+
+        x = contract(x=x, roi=self.aabb, type=self.contraction_type)
+        x, _ = self.deformation_field(x)
+        x = to_original(self.aabb, x)
+        return x
+
     def get_density(self, ray_samples: RaySamples):
         positions = ray_samples.frustums.get_positions()
         positions_flat = positions.view(-1, 3)
         positions_flat = contract(x=positions_flat, roi=self.aabb, type=self.contraction_type)
         # print("pos", positions_flat.max(0)[0], positions_flat.min(0)[0])
+        deform_extra = None
         if self.deformation_field is not None:
-            positions_flat = self.deformation_field(positions_flat)
+            positions_flat, deform_extra = self.deformation_field(positions_flat)
             # print("field temp debug", self.deformation_field.weight, self.deformation_field.bias)
 
         h = self.mlp_base(positions_flat).view(*ray_samples.frustums.shape, -1)
@@ -159,12 +168,19 @@ class TCNNInstantNGPField(Field):
         # density[pos_bb[:, 0] < -0.3] = 0
         # density[torch.max(torch.abs(positions_flat - 0.5), -1)[0] * 2 > 0.6] = 0.0
         # density[torch.max(torch.abs(positions_flat - 0.5), -1)[0] * 2 > 0.95] = 1.0
-        return density, base_mlp_out
+        return density, (base_mlp_out, deform_extra)
 
-    def get_outputs(self, ray_samples: RaySamples, density_embedding: Optional[TensorType] = None):
-        directions = get_normalized_directions(ray_samples.frustums.directions)
+    def get_outputs(self, ray_samples: RaySamples, density_embedding=None):
+        deform_extra = None
+        if type(density_embedding) == tuple:
+            density_embedding, deform_extra = density_embedding
+        directions = ray_samples.frustums.directions.reshape(-1, 3)
+        if deform_extra is not None:
+            deform_rot, deform_direction_fn = deform_extra
+            directions = deform_direction_fn(directions, deform_rot)
+
+        directions = get_normalized_directions(directions)
         directions_flat = directions.view(-1, 3)
-
         d = self.direction_encoding(directions_flat)
         if density_embedding is None:
             positions = SceneBox.get_normalized_positions(ray_samples.frustums.get_positions(), self.aabb)
@@ -185,10 +201,6 @@ class TCNNInstantNGPField(Field):
             h = torch.cat([h, embedded_appearance.view(-1, self.appearance_embedding_dim)], dim=-1)
 
         rgb = self.mlp_head(h).view(*ray_samples.frustums.directions.shape[:-1], -1).to(directions)
-        # positions = ray_samples.frustums.get_positions()
-        # positions_flat = positions.view(-1, 3)
-        # positions_flat = contract(x=positions_flat, roi=self.aabb, type=self.contraction_type)
-        # rgb[torch.max(torch.abs(positions_flat - 0.5), -1)[0] * 2 > 0.95] = 0.0
         return {FieldHeadNames.RGB: rgb}
 
     def get_opacity(self, positions: TensorType["bs":..., 3], step_size) -> TensorType["bs":..., 1]:

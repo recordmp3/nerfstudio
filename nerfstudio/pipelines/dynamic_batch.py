@@ -35,6 +35,8 @@ class DynamicBatchPipelineConfig(VanillaPipelineConfig):
     """The target number of samples to use for an entire batch of rays."""
     max_num_samples_per_ray: int = 1024  # 1 << 10
     """The maximum number of samples to be placed along a ray."""
+    keypoints_dir: str = ""
+    """the dir where keypoint is stored. Used to sample keypoints for corresponence loss"""
 
 
 class DynamicBatchPipeline(VanillaPipeline):

@@ -112,7 +112,7 @@ class Optimizers:
         for _, optimizer in self.optimizers.items():
             # print(_, optimizer.param_groups)
             for x in optimizer.param_groups[0]["params"]:
-                print("A", _, x.shape, x.requires_grad, x.grad)
+                print("A", _, x.shape, x.requires_grad, x.grad.mean() if x.requires_grad else "no grad")
         # for param_group_name, params in self.param_groups.items():
         #     print(param_group_name, len(params))
         #     for x in params:

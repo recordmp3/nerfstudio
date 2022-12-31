@@ -58,6 +58,7 @@ class VanillaModelConfig(ModelConfig):
     """Specifies whether or not to include ray warping based on time."""
     temporal_distortion_params: Dict[str, Any] = to_immutable_dict({"kind": TemporalDistortionKind.DNERF})
     """Parameters to instantiate temporal distortion with"""
+    deformation_status: str = "inactive"
 
 
 class NeRFModel(Model):
@@ -67,18 +68,13 @@ class NeRFModel(Model):
         config: Basic NeRF configuration to instantiate model
     """
 
-    def __init__(
-        self,
-        config: VanillaModelConfig,
-        **kwargs,
-    ) -> None:
+    def __init__(self, config: VanillaModelConfig, **kwargs,) -> None:
         self.field_coarse = None
         self.field_fine = None
         self.temporal_distortion = None
 
         super().__init__(
-            config=config,
-            **kwargs,
+            config=config, **kwargs,
         )
 
     def populate_modules(self):
@@ -93,15 +89,9 @@ class NeRFModel(Model):
             in_dim=3, num_frequencies=4, min_freq_exp=0.0, max_freq_exp=4.0, include_input=True
         )
 
-        self.field_coarse = NeRFField(
-            position_encoding=position_encoding,
-            direction_encoding=direction_encoding,
-        )
+        self.field_coarse = NeRFField(position_encoding=position_encoding, direction_encoding=direction_encoding,)
 
-        self.field_fine = NeRFField(
-            position_encoding=position_encoding,
-            direction_encoding=direction_encoding,
-        )
+        self.field_fine = NeRFField(position_encoding=position_encoding, direction_encoding=direction_encoding,)
 
         # samplers
         self.sampler_uniform = UniformSampler(num_samples=self.config.num_coarse_samples)
@@ -134,6 +124,14 @@ class NeRFModel(Model):
             param_groups["temporal_distortion"] = list(self.temporal_distortion.parameters())
         return param_groups
 
+    def get_outputs1(self, ray_bundle: RayBundle):
+
+        return (ray_bundle,)
+
+    def get_outputs2(self, ray_bundle: RayBundle):
+
+        return self.get_outputs(ray_bundle)
+
     def get_outputs(self, ray_bundle: RayBundle):
 
         if self.field_coarse is None or self.field_fine is None:
@@ -148,10 +146,7 @@ class NeRFModel(Model):
         # coarse field:
         field_outputs_coarse = self.field_coarse.forward(ray_samples_uniform)
         weights_coarse = ray_samples_uniform.get_weights(field_outputs_coarse[FieldHeadNames.DENSITY])
-        rgb_coarse = self.renderer_rgb(
-            rgb=field_outputs_coarse[FieldHeadNames.RGB],
-            weights=weights_coarse,
-        )
+        rgb_coarse = self.renderer_rgb(rgb=field_outputs_coarse[FieldHeadNames.RGB], weights=weights_coarse,)
         accumulation_coarse = self.renderer_accumulation(weights_coarse)
         depth_coarse = self.renderer_depth(weights_coarse, ray_samples_uniform)
 
@@ -164,10 +159,7 @@ class NeRFModel(Model):
         # fine field:
         field_outputs_fine = self.field_fine.forward(ray_samples_pdf)
         weights_fine = ray_samples_pdf.get_weights(field_outputs_fine[FieldHeadNames.DENSITY])
-        rgb_fine = self.renderer_rgb(
-            rgb=field_outputs_fine[FieldHeadNames.RGB],
-            weights=weights_fine,
-        )
+        rgb_fine = self.renderer_rgb(rgb=field_outputs_fine[FieldHeadNames.RGB], weights=weights_fine,)
         accumulation_fine = self.renderer_accumulation(weights_fine)
         depth_fine = self.renderer_depth(weights_fine, ray_samples_pdf)
 

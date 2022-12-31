@@ -22,7 +22,9 @@ from typing import Dict
 import torch
 
 
-def collate_image_dataset_batch(batch: Dict, num_rays_per_batch: int, keep_full_image: bool = False, stored={}):
+def collate_image_dataset_batch(
+    batch: Dict, num_rays_per_batch: int, keep_full_image: bool = False, stored={}, keypoints_new=None
+):
     """
     Operates on a batch of images and samples pixels to use for generating rays.
     Returns a collated batch which is input to the Graph.
@@ -38,7 +40,7 @@ def collate_image_dataset_batch(batch: Dict, num_rays_per_batch: int, keep_full_
 
     # only sample within the mask, if the mask is in the batch
     if "mask" in batch:
-        # print("mask_shape", batch["mask"].shape)
+        # batch["mask"].shape [H, W, 1]
         if not bool(stored):
             nonzero_indices = torch.nonzero(batch["mask"][..., 0].to(device), as_tuple=False)
             stored["nonzero"] = nonzero_indices
@@ -55,20 +57,24 @@ def collate_image_dataset_batch(batch: Dict, num_rays_per_batch: int, keep_full_
         indices = nonzero_indices[chosen_indices]
         indices[:empty_num_rays, :] = empty_indices
     else:
+        print("no mask")
         indices = torch.floor(
             torch.rand((num_rays_per_batch, 3), device=device)
             * torch.tensor([num_images, image_height, image_width], device=device)
         ).long()
-
+    if keypoints_new is not None:
+        keypoints = torch.zeros((keypoints_new.shape[0], 3)).to(indices.device)
+        keypoints[:, 1:] = keypoints_new.to(device)
+        indices = torch.cat([indices, keypoints.long()], 0)
     c, y, x = (i.flatten() for i in torch.split(indices, 1, dim=-1))
     collated_batch = {key: value[c, y, x] for key, value in batch.items() if key != "image_idx" and value is not None}
-
+    collated_batch["image"] = collated_batch["image"][:num_rays_per_batch]
     assert collated_batch["image"].shape == (num_rays_per_batch, 3), collated_batch["image"].shape
 
     # Needed to correct the random indices to their actual camera idx locations.
     indices[:, 0] = batch["image_idx"][c]
     collated_batch["indices"] = indices  # with the abs camera indices
-
+    # collated_batch.keys(): [image, indices]
     if keep_full_image:
         collated_batch["full_image"] = batch["image"]
 
@@ -167,7 +173,7 @@ class PixelSampler:  # pylint: disable=too-few-public-methods
         """
         self.num_rays_per_batch = num_rays_per_batch
 
-    def sample(self, image_batch: Dict):
+    def sample(self, image_batch: Dict, keypoints_new=None):
         """Sample an image batch and return a pixel batch.
 
         Args:
@@ -180,7 +186,11 @@ class PixelSampler:  # pylint: disable=too-few-public-methods
             )
         elif isinstance(image_batch["image"], torch.Tensor):
             pixel_batch = collate_image_dataset_batch(
-                image_batch, self.num_rays_per_batch, keep_full_image=self.keep_full_image, stored=self.stored
+                image_batch,
+                self.num_rays_per_batch,
+                keep_full_image=self.keep_full_image,
+                stored=self.stored,
+                keypoints_new=keypoints_new,
             )
         else:
             raise ValueError("image_batch['image'] must be a list or torch.Tensor")

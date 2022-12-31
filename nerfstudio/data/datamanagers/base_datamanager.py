@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
+from torch.nn import Parameter
 import tyro
 from rich.progress import Console
 from torch import nn
@@ -300,6 +301,7 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
         test_mode: Literal["test", "val", "inference"] = "val",
         world_size: int = 1,
         local_rank: int = 0,
+        keypoints_new=None,
         **kwargs,  # pylint: disable=unused-argument
     ):
         self.config = config
@@ -314,6 +316,9 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
         self.train_dataset = self.create_train_dataset()
         self.eval_dataset = self.create_eval_dataset()
         super().__init__()
+        self.keypoints_new = None
+        if keypoints_new is not None:
+            self.keypoints_new = Parameter(keypoints_new, requires_grad=False)  # [N,2]
 
     def create_train_dataset(self) -> InputDataset:
         """Sets up the data loaders for training"""
@@ -398,9 +403,12 @@ class VanillaDataManager(DataManager):  # pylint: disable=abstract-method
         """Returns the next batch of data from the train dataloader."""
         self.train_count += 1
         image_batch = next(self.iter_train_image_dataloader)
-        batch = self.train_pixel_sampler.sample(image_batch)
+        batch = self.train_pixel_sampler.sample(image_batch, self.keypoints_new)
         ray_indices = batch["indices"]
+        # print("ray", ray_indices.shape, ray_indices[0]) # [N,3], [0, y, x]
         ray_bundle = self.train_ray_generator(ray_indices)
+        if self.keypoints_new is not None:
+            ray_bundle.extra_info["keypoints_included"] = True
         return ray_bundle, batch
 
     def next_eval(self, step: int) -> Tuple[RayBundle, Dict]:

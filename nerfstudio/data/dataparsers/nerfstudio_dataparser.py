@@ -64,8 +64,8 @@ class NerfstudioDataParserConfig(DataParserConfig):
     """Whether to automatically scale the poses to fit in +/- 1 bounding box."""
     train_split_percentage: float = 0.95
     """The percent of images to use for training. The remaining images are for eval."""
-    train_start: int = 0
-    train_end: int = 306
+    train_start: int = 306
+    train_end: int = 307
     """range of training set"""
 
 
@@ -208,7 +208,8 @@ class Nerfstudio(DataParser):
         image_filenames = [image_filenames[i] for i in indices]
         mask_filenames = [mask_filenames[i] for i in indices] if len(mask_filenames) > 0 else []
         poses = poses[indices]
-
+        # if split == "train":
+        #     print(split, poses)
         # in x,y,z order
         # assumes that the scene is centered at the origin
         aabb_scale = self.config.scene_scale

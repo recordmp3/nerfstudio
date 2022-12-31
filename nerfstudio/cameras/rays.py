@@ -69,11 +69,7 @@ class Frustums(TensorDataclass):
         if self.offsets is not None:
             raise NotImplementedError()
         return conical_frustum_to_gaussian(
-            origins=self.origins,
-            directions=self.directions,
-            starts=self.starts,
-            ends=self.ends,
-            radius=cone_radius,
+            origins=self.origins, directions=self.directions, starts=self.starts, ends=self.ends, radius=cone_radius,
         )
 
     @classmethod
@@ -159,6 +155,13 @@ class RayBundle(TensorDataclass):
     """Additional metadata or data needed for interpolation, will mimic shape of rays"""
     times: Optional[TensorType[..., 1]] = None
     """Times at which rays are sampled"""
+    extra_info = {"keypoints_included": False}
+
+    def get_positions_depth(self, depth):
+        assert len(depth.shape) == 2
+        # print("ori in cameras/rays.py", self.origins)
+        pos = self.origins + self.directions * depth
+        return pos
 
     def set_camera_indices(self, camera_index: int) -> None:
         """Sets all of the the camera indices to a specific camera index.

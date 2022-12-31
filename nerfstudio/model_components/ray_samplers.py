@@ -88,7 +88,9 @@ class SpacedSampler(Sampler):
         assert ray_bundle is not None
         assert ray_bundle.nears is not None
         assert ray_bundle.fars is not None
-
+        # ray_bundle.nears[:] = 1.0
+        # print("near far", ray_bundle.nears.min(), ray_bundle.nears.max(), ray_bundle.nears.mean())
+        # print("near far", ray_bundle.fars.min(), ray_bundle.fars.max(), ray_bundle.fars.mean())
         num_samples = num_samples or self.num_samples
         assert num_samples is not None
         num_rays = ray_bundle.origins.shape[0]

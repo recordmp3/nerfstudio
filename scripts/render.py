@@ -24,7 +24,7 @@ from rich.progress import (
 )
 from typing_extensions import Literal, assert_never
 
-from nerfstudio.cameras.camera_paths import get_path_from_json, get_spiral_path
+from nerfstudio.cameras.camera_paths import get_path_from_json, get_spiral_path, get_spiral_path2
 from nerfstudio.cameras.cameras import Cameras
 from nerfstudio.configs.base_config import Config  # pylint: disable=unused-import
 from nerfstudio.pipelines.base_pipeline import Pipeline
@@ -85,8 +85,18 @@ def _render_trajectory_video(
                 output_image = outputs[rendered_output_name].cpu().numpy()
                 render_image.append(output_image)
             render_image = np.concatenate(render_image, axis=1)
+            print(render_image.shape, render_image.max(), render_image.min(), render_image.mean())
             if output_format == "images":
-                media.write_image(output_image_dir / f"{camera_idx:05d}.png", render_image)
+                if render_image.shape[2] == 1:
+                    np.save(output_image_dir / f"{camera_idx:05d}.npy", render_image)
+                    render_image = render_image.astype(np.float32)
+                    media.write_image(
+                        output_image_dir / f"{camera_idx:05d}_{rendered_output_name}.png",
+                        ((render_image - render_image.min()) / (render_image.max() - render_image.min())).repeat(3, -1),
+                    )
+                    # input()
+                else:
+                    media.write_image(output_image_dir / f"{camera_idx:05d}.png", render_image)
             else:
                 images.append(render_image)
 
@@ -107,7 +117,9 @@ class RenderTrajectory:
     # Path to config YAML file.
     load_config: Path
     # Name of the renderer outputs to use. rgb, depth, etc. concatenates them along y axis
-    rendered_output_names: List[str] = field(default_factory=lambda: ["rgb"])
+    rendered_output_names: List[str] = field(
+        default_factory=lambda: ["rgb"]
+    )  # ['rgb', 'accumulation', 'depth', 'alive_ray_mask', 'num_samples_per_ray']
     #  Trajectory to render.
     traj: Literal["spiral", "filename"] = "spiral"
     # Scaling factor to apply to the camera image resolution.
@@ -139,7 +151,9 @@ class RenderTrajectory:
         if self.traj == "spiral":
             camera_start = pipeline.datamanager.eval_dataloader.get_camera(image_idx=0).flatten()
             # TODO(ethan): pass in the up direction of the camera
-            camera_path = get_spiral_path(camera_start, steps=30, radius=0.1)
+            camera_path = get_spiral_path2(camera_start, steps=120, radius=0.1)
+            np.save("renders/output/camera_to_worlds.npy", camera_path.camera_to_worlds.cpu().numpy())
+            # print(camera_path.camera_to_worlds)  # Tensor [N,3,4]
         elif self.traj == "filename":
             with open(self.camera_path_filename, "r", encoding="utf-8") as f:
                 camera_path = json.load(f)

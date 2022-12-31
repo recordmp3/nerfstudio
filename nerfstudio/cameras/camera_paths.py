@@ -95,17 +95,112 @@ def get_spiral_path(
         local_c2whs.append(c2wh)
 
     new_c2ws = []
+    first_cam = torch.Tensor(
+        [[-0.1865, -0.3247, 0.9273, 0.8318], [0.9823, -0.0462, 0.1814, 0.2519], [-0.0160, 0.9447, 0.3276, -0.2828]]
+    ).to(camera.device)
+
     for local_c2wh in local_c2whs:
         c2wh = torch.matmul(c2wh_global, local_c2wh)
         new_c2ws.append(c2wh[:3, :4])
     new_c2ws = torch.stack(new_c2ws, dim=0)
+    new_c2ws[0] = first_cam
+    print(camera, new_c2ws)
+    return Cameras(fx=camera.fx[0], fy=camera.fy[0], cx=camera.cx[0], cy=camera.cy[0], camera_to_worlds=new_c2ws,)
 
+
+def skew(w):
+
+    W = torch.zeros(w.shape[0], 3, 3).to(w.device)
+    W[:, 0, 1] = -w[:, 2]
+    W[:, 0, 2] = w[:, 1]
+    W[:, 1, 0] = w[:, 2]
+    W[:, 1, 2] = -w[:, 0]
+    W[:, 2, 0] = -w[:, 1]
+    W[:, 2, 1] = w[:, 0]
+    return W
+
+
+def exp_so3(w, theta):  # w[N,3], theta[N,1]
+
+    W = skew(w)
+    return (
+        torch.eye(3).repeat(W.shape[0], 1, 1).to(W.device)
+        + torch.sin(theta[:, :, None]) * W
+        + (1 - torch.cos(theta[:, :, None])) * (W @ W)
+    )
+
+
+def get_spiral_path2(
+    camera: Cameras,
+    steps: int = 30,
+    radius: Optional[float] = None,
+    radiuses: Optional[Tuple[float]] = None,
+    rots: int = 1,
+    zrate: float = 0.5,
+) -> Cameras:
+    """
+    Returns a list of camera in a sprial trajectory.
+
+    Args:
+        camera: The camera to start the spiral from.
+        steps: The number of cameras in the generated path.
+        radius: The radius of the spiral for all xyz directions.
+        radiuses: The list of radii for the spiral in xyz directions.
+        rots: The number of rotations to apply to the camera.
+        zrate: How much to change the z position of the camera.
+
+    Returns:
+        A spiral camera path.
+    """
+    print(camera)
+    assert radius is not None or radiuses is not None, "Either radius or radiuses must be specified."
+    assert camera.ndim == 1, "We assume only one batch dim here"
+    if radius is not None and radiuses is None:
+        rad = torch.tensor([radius] * 3, device=camera.device)
+    elif radiuses is not None and radius is None:
+        rad = torch.tensor(radiuses, device=camera.device)
+    else:
+        raise ValueError("Only one of radius or radiuses must be specified.")
+
+    up = camera.camera_to_worlds[0, :3, 2]  # scene is z up
+    focal = torch.min(camera.fx[0], camera.fy[0])
+    target = torch.tensor([0, 0, -focal], device=camera.device)  # camera looking in -z direction
+
+    c2w = camera.camera_to_worlds[0]
+    c2wh_global = pose_utils.to4x4(c2w)
+
+    first_cam = torch.Tensor(
+        [[-0.1865, -0.3247, 0.9273, 0.8318], [0.9823, -0.0462, 0.1814, 0.2519], [-0.0160, 0.9447, 0.3276, -0.2828]]
+    ).to(camera.device)
+    local_c2whs = []
+    new_c2ws = []
+
+    for theta in torch.linspace(0.0, 2.0 * torch.pi * rots, steps + 1)[:-1]:
+        rot = (
+            exp_so3(torch.Tensor([0, 0, 1]).reshape(1, 3), torch.Tensor([theta]).reshape(1, 1))
+            .reshape(3, 3)
+            .to(camera.device)
+        )
+        temp = rot @ first_cam
+        center = (
+            torch.tensor([torch.cos(theta), -torch.sin(theta), -torch.sin(theta * zrate)], device=camera.device) * rad
+        )
+        lookat = center - target
+        c2w = camera_utils.viewmatrix(lookat, up, center)
+        c2wh = pose_utils.to4x4(c2w)
+        c2wh[:3] = temp
+        local_c2whs.append(c2wh)
+        new_c2ws.append(temp)
+    new_c2ws = torch.stack(new_c2ws, dim=0)
+    new_c2ws[0] = first_cam
     return Cameras(
         fx=camera.fx[0],
         fy=camera.fy[0],
         cx=camera.cx[0],
         cy=camera.cy[0],
         camera_to_worlds=new_c2ws,
+        width=camera.width[0],
+        height=camera.height[0],
     )
 
 
@@ -138,10 +233,4 @@ def get_path_from_json(camera_path: Dict[str, Any]) -> Cameras:
     camera_to_worlds = torch.stack(c2ws, dim=0)
     fx = torch.tensor(fxs)
     fy = torch.tensor(fys)
-    return Cameras(
-        fx=fx,
-        fy=fy,
-        cx=image_width / 2,
-        cy=image_height / 2,
-        camera_to_worlds=camera_to_worlds,
-    )
+    return Cameras(fx=fx, fy=fy, cx=image_width / 2, cy=image_height / 2, camera_to_worlds=camera_to_worlds,)

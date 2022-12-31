@@ -93,8 +93,14 @@ class NGPModel(Model):
     config: InstantNGPModelConfig
     field: TCNNInstantNGPField
 
-    def __init__(self, config: InstantNGPModelConfig, **kwargs) -> None:
+    def __init__(self, config: InstantNGPModelConfig, keypoints_old=None, **kwargs) -> None:
         super().__init__(config=config, **kwargs)
+
+        self.keypoints_old = None
+        self.n_keypoints = 0
+        if keypoints_old is not None:
+            self.keypoints_old = Parameter(keypoints_old, requires_grad=False)  # [N,3]
+            self.n_keypoints = self.keypoints_old.shape[0]
 
     def populate_modules(self):
         """Set the fields and modules."""
@@ -110,8 +116,15 @@ class NGPModel(Model):
         self.deformation_field = None
         if self.config.deformation_status != "inactive":
             self.deformation_field = Deformation(
-                # body_config={"type": DeformationMLPDeltaX, "D": 6, "W": 128, "skips": [4]},
-                body_config={"type": DeformationMLPSE3, "input_ch": 3, "D": 6, "W": 128, "skips": [4]},
+                body_config={"type": DeformationMLPDeltaX, "D": 6, "W": 128, "skips": [4]},
+                # body_config={
+                #     "type": DeformationMLPSE3,
+                #     "input_ch": 3,
+                #     "D": 6,
+                #     "W": 128,
+                #     "skips": [4],
+                #     "aabb": self.scene_box.aabb,
+                # },
                 embedding_config={"multires": 10, "input_dims": 3,},
                 # contractor=lambda positions_flat: contract(
                 #     x=positions_flat, roi=self.field.aabb, type=self.field.contraction_type
@@ -142,6 +155,7 @@ class NGPModel(Model):
 
         # losses
         self.rgb_loss = MSELoss()
+        self.keypoint_loss = MSELoss()
 
         # metrics
         self.psnr = PeakSignalNoiseRatio(data_range=1.0)
@@ -192,7 +206,6 @@ class NGPModel(Model):
 
     def get_outputs2(self, ray_bundle, ray_samples, packed_info, ray_indices):
         num_rays = len(ray_bundle)
-
         field_outputs = self.field(ray_samples)
 
         # accumulation
@@ -211,14 +224,29 @@ class NGPModel(Model):
         )
         accumulation = self.renderer_accumulation(weights=weights, ray_indices=ray_indices, num_rays=num_rays)
         alive_ray_mask = accumulation.squeeze(-1) > 0
+        # print("depth shape", depth.shape) # [N, 1]
+        pt = ray_bundle.get_positions_depth(depth)
 
-        outputs = {
-            "rgb": rgb,
-            "accumulation": accumulation,
-            "depth": depth,
-            "alive_ray_mask": alive_ray_mask,  # the rays we kept from sampler
-            "num_samples_per_ray": packed_info[:, 1],
-        }
+        if ray_bundle.extra_info["keypoints_included"]:
+            pt_keypoint = pt[-self.n_keypoints :]
+            pt_keypoint_c = self.field.get_new_pt_from_deform(pt_keypoint)
+            outputs = {
+                "rgb": rgb[: -self.n_keypoints],
+                "accumulation": accumulation[: -self.n_keypoints],
+                "depth": depth[: -self.n_keypoints],
+                "alive_ray_mask": alive_ray_mask[: -self.n_keypoints],  # the rays we kept from sampler
+                "num_samples_per_ray": packed_info[: -self.n_keypoints, 1],
+                "pt_keypoint_c": pt_keypoint_c,
+                "alive_ray_mask_keypoint": alive_ray_mask[-self.n_keypoints :],
+            }
+        else:
+            outputs = {
+                "rgb": rgb,
+                "accumulation": accumulation,
+                "depth": depth,
+                "alive_ray_mask": alive_ray_mask,  # the rays we kept from sampler
+                "num_samples_per_ray": packed_info[:, 1],
+            }
         return outputs
 
     def get_metrics_dict(self, outputs, batch):
@@ -231,8 +259,35 @@ class NGPModel(Model):
     def get_loss_dict(self, outputs, batch, metrics_dict=None):
         image = batch["image"].to(self.device)
         mask = outputs["alive_ray_mask"]
+        # print(mask.float().mean()) # around 0.2
         rgb_loss = self.rgb_loss(image[mask], outputs["rgb"][mask])
-        loss_dict = {"rgb_loss": rgb_loss}
+        keypoint_loss = torch.zeros((1,))
+        has_keypoint = False
+        if "pt_keypoint_c" in outputs.keys():
+            has_keypoint = True
+            mask_keypoint = outputs["alive_ray_mask_keypoint"]
+            pt_keypoint_c = outputs["pt_keypoint_c"]
+            keypoint_loss = self.keypoint_loss(pt_keypoint_c[mask_keypoint], self.keypoints_old[mask_keypoint].detach())
+        rgb_loss_all = self.rgb_loss(image, outputs["rgb"])
+
+        f = open("/home/zt15/projects/nerfstudio/rgb.txt", "a")
+        f.write(str(keypoint_loss.item()) + " ")
+        print(
+            "************************** loss",
+            rgb_loss.item(),
+            rgb_loss_all.item(),
+            keypoint_loss.item(),
+            image[mask].shape,
+            outputs["rgb"][mask].shape,
+        )
+        if has_keypoint:
+            loss_dict = {
+                "keypoint_loss": keypoint_loss,
+            }
+        else:
+            loss_dict = {
+                "rgb_loss": rgb_loss_all,
+            }
         return loss_dict
 
     def get_image_metrics_and_images(

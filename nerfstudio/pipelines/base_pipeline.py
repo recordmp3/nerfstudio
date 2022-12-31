@@ -217,9 +217,17 @@ class VanillaPipeline(Pipeline):
     ):
         super().__init__()
         self.config = config
+        keypoints_new, keypoints_old = None, None  # 2D and 3D
+        if config.keypoints_dir:
+            res = torch.load(config.keypoints_dir)
+            keypoints_old, keypoints_new = res[0], res[1]
         self.test_mode = test_mode
         self.datamanager: VanillaDataManager = config.datamanager.setup(
-            device=device, test_mode=test_mode, world_size=world_size, local_rank=local_rank
+            device=device,
+            test_mode=test_mode,
+            world_size=world_size,
+            local_rank=local_rank,
+            keypoints_new=keypoints_new,
         )
         self.datamanager.to(device)
         # TODO(ethan): get rid of scene_bounds from the model
@@ -229,6 +237,7 @@ class VanillaPipeline(Pipeline):
             scene_box=self.datamanager.train_dataset.scene_box,
             num_train_data=len(self.datamanager.train_dataset),
             metadata=self.datamanager.train_dataset.metadata,
+            keypoints_old=keypoints_old,
         )
         self.model.to(device)
 
